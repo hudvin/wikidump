@@ -9,6 +9,8 @@ import org.apache.hadoop.hbase.{KeyValue, HColumnDescriptor, HTableDescriptor, H
 import org.apache.hadoop.hbase.client.{Put, HTable, HBaseAdmin}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.util.Bytes
+import scala.collection.JavaConversions._
+import scala.collection.mutable.ListBuffer
 
 /**
  * Created with IntelliJ IDEA.
@@ -44,6 +46,8 @@ object Parser {
   private var hbase:HBaseAdmin = null
   private var conf:Configuration = null
   private var table:HTable = null
+
+  private val newRecords:java.util.List[Put] = new java.util.LinkedList[Put]
 
   private def createHbaseConnect(){
     conf = HBaseConfiguration.create()
@@ -96,7 +100,16 @@ object Parser {
     p.add(Bytes.toBytes("revision_minor"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.minor))
     p.add(Bytes.toBytes("revision_contributor_id"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.contributor.id))
 
-    table.put(p)
+    newRecords.append(p)
+    if (newRecords.size>500){
+      table.setAutoFlush(false    )
+      table.put(newRecords)
+      table.flushCommits()
+      newRecords.clear()
+    }
+
+    //table.put(p)
+   //table.batch(new ListBuffer[Put](p))
   }
 
 
