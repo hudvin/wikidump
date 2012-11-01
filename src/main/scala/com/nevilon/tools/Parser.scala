@@ -65,7 +65,7 @@ object Parser {
   private val HBASE_MASTER_VALUE = "localhost:60000"
 
 
-  private val DEFAULT_TABLE_NAME = "wiki_test"
+  private val DEFAULT_TABLE_NAME = "wiki"
 
   private val recordsCache:java.util.List[Put] = new java.util.LinkedList[Put]
   private val cacheSize = 500
