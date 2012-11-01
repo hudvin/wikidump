@@ -1,11 +1,10 @@
 package com.nevilon.tools.wikidump
 import collection.mutable
-import collection.mutable.ListBuffer
 import scala.xml.pull._
 import scala.io.Source
 import Predef._
 import java.io._
-import org.apache.hadoop.hbase.{KeyValue, HColumnDescriptor, HTableDescriptor, HBaseConfiguration}
+import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor, HBaseConfiguration}
 import org.apache.hadoop.hbase.client.{Put, HTable, HBaseAdmin}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.util.Bytes
@@ -43,35 +42,57 @@ object Parser {
   private val TITLE_ATTR: String = "title"
   private val USERNAME_TAG = "username"
 
+
+  private val TITLE_FAMILY = "title"
+  private val NS_FAMILY = "ns"
+  private val ID_FAMILY = "id"
+  private val REDIRECT_TITLE_FAMILY = "redirect_title"
+  private val REVISION_ID_FAMILY = "revision_id"
+  private val REVISION_PARENT_ID_FAMILY = "revision_parent_id"
+  private val REVISION_TIMESTAMP_FAMILY = "revision_timestamp"
+  private val REVISION_COMMENT_FAMILY = "revision_comment"
+  private val REVISION_SHA1_FAMILY = "revision_sha1"
+  private val REVISION_TEXT_FAMILY = "revison_text"
+  private val REVISION_MINOR_FAMILY = "revision_minor"
+  private val REVISION_CONTRIBUTOR_ID_FAMILY = "revision_contributor_id"
+  private val REVISION_CONTRIBUTOR_USERNAME_FAMILY = "revision_contributor_username"
+
   private var hbase:HBaseAdmin = null
   private var conf:Configuration = null
   private var table:HTable = null
 
-  private val newRecords:java.util.List[Put] = new java.util.LinkedList[Put]
+  private val HBASE_MASTER_KEY  = "hbase.master"
+  private val HBASE_MASTER_VALUE = "localhost:60000"
+
+
+  private val DEFAULT_TABLE_NAME = "wiki_test"
+
+  private val recordsCache:java.util.List[Put] = new java.util.LinkedList[Put]
+  private val cacheSize = 500
+
 
   private def createHbaseConnect(){
     conf = HBaseConfiguration.create()
-    conf.set("hbase.master","localhost:60000")
+    conf.set(HBASE_MASTER_KEY,HBASE_MASTER_VALUE)
     hbase = new HBaseAdmin(conf)
  }
 
   def createTable(tableName:String){
     val tableDesc:HTableDescriptor = new HTableDescriptor(tableName)
 
-    tableDesc.addFamily( new HColumnDescriptor("revison_contribitorusername"))
-    tableDesc.addFamily( new HColumnDescriptor("title"))
-    tableDesc.addFamily( new HColumnDescriptor("ns"))
-    tableDesc.addFamily( new HColumnDescriptor("id"))
-    tableDesc.addFamily( new HColumnDescriptor("redirect_title"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_id"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_parent_id"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_timestamp"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_comment"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_sha1"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_text"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_minor"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_contributor_id"))
-    tableDesc.addFamily( new HColumnDescriptor("revision_contributor_username"))
+    tableDesc.addFamily( new HColumnDescriptor(TITLE_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(NS_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(ID_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REDIRECT_TITLE_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_ID_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_PARENT_ID_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_TIMESTAMP_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_COMMENT_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_SHA1_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_TEXT_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_MINOR_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_CONTRIBUTOR_ID_FAMILY))
+    tableDesc.addFamily( new HColumnDescriptor(REVISION_CONTRIBUTOR_USERNAME_FAMILY))
 
     hbase.createTable(tableDesc)
   }
@@ -85,55 +106,44 @@ object Parser {
   }
 
   def insert(wikiPage:WikiPage){
-    val p = new Put(Bytes.toBytes(wikiPage.title))//name of record!
-    p.add(Bytes.toBytes("revision_contributor_username"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.contributor.username))
-    p.add(Bytes.toBytes("title"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.title))
-    p.add(Bytes.toBytes("id"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.id))
-    p.add(Bytes.toBytes("ns"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.ns))
-    p.add(Bytes.toBytes("redirect_title"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.redirectTitle))
-    p.add(Bytes.toBytes("revision_id"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.id))
-    p.add(Bytes.toBytes("revision_parent_id"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.parentId))
-    p.add(Bytes.toBytes("revision_timestamp"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.timestamp))
-    p.add(Bytes.toBytes("revision_comment"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.comment))
-    p.add(Bytes.toBytes("revision_sha1"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.sha1))
-    p.add(Bytes.toBytes("revision_text"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.text))
-    p.add(Bytes.toBytes("revision_minor"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.minor))
-    p.add(Bytes.toBytes("revision_contributor_id"), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.contributor.id))
+    val p = new Put(Bytes.toBytes(wikiPage.title))
+    p.add(Bytes.toBytes(REVISION_CONTRIBUTOR_USERNAME_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.contributor.username))
+    p.add(Bytes.toBytes(TITLE_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.title))
+    p.add(Bytes.toBytes(ID_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.id))
+    p.add(Bytes.toBytes(NS_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.ns))
+    p.add(Bytes.toBytes(REDIRECT_TITLE_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.redirectTitle))
+    p.add(Bytes.toBytes(REVISION_ID_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.id))
+    p.add(Bytes.toBytes(REVISION_PARENT_ID_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.parentId))
+    p.add(Bytes.toBytes(REVISION_TIMESTAMP_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.timestamp))
+    p.add(Bytes.toBytes(REVISION_COMMENT_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.comment))
+    p.add(Bytes.toBytes(REVISION_SHA1_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.sha1))
+    p.add(Bytes.toBytes(REVISION_TEXT_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.text))
+    p.add(Bytes.toBytes(REVISION_MINOR_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.minor))
+    p.add(Bytes.toBytes(REVISION_CONTRIBUTOR_ID_FAMILY), Bytes.toBytes(""),Bytes.toBytes(wikiPage.revision.contributor.id))
 
-    newRecords.append(p)
-    if (newRecords.size>500){
+    recordsCache+=p
+    if (recordsCache.size>cacheSize){
       table.setAutoFlush(false    )
-      table.put(newRecords)
+      table.put(recordsCache)
       table.flushCommits()
-      newRecords.clear()
+      recordsCache.clear()
     }
-
-    //table.put(p)
-   //table.batch(new ListBuffer[Put](p))
   }
 
 
   def main(args: Array[String]) {
     createHbaseConnect()
-    val tableName = "wiki"
+    val tableName = DEFAULT_TABLE_NAME
     if (!tableExists(tableName)){
       createTable(tableName)
     }
     openTable(tableName)
 
-
-//    var p = new WikiPage
-//    p.title = "title"
-//    p.id = 0
-//    insert(p)
-
     var counter:Int = 0
-
 
     val xmlReader =
       new XMLEventReader(Source.fromInputStream(
         new BufferedInputStream(java.lang.System.in), "utf-8")).buffered
-
 
     var wikiPage: WikiPage = null
     val wikiPages = new ListBuffer[WikiPage]()
@@ -141,32 +151,24 @@ object Parser {
     val path: mutable.Stack[String] = new mutable.Stack[String]
     while (xmlReader.hasNext) {
       val v = xmlReader.next
-
       v match {
-
         case EvElemStart(_, PAGE_TAG, _, _) => {
           path.push(PAGE_TAG)
           wikiPage = new WikiPage
         }
-
         case EvElemStart(_, label, attr_, _) => {
           path.push(label)
           buffer = new StringBuilder
-
           label match {
-
             case REDIRECT_TAG => {
               val redirect = attr_.get(TITLE_ATTR).get.toString()
               if (attr_.get(TITLE_ATTR) != None) {
                 wikiPage.redirectTitle = redirect
               }
             }
-
             case _ => {}
-
           }
         }
-
         case EvElemEnd(_, label) => {
           path.pop()
           label match {
@@ -175,13 +177,10 @@ object Parser {
               println(counter)
               insert(wikiPage)
               //wikiPages.append(wikiPage)
-              //println(wikiPage)
             }
-
             case TITLE_TAG => {
               wikiPage.title = buffer.toString()
             }
-
             case NS_TAG => {
               wikiPage.ns = buffer.toString()
             }
@@ -201,7 +200,6 @@ object Parser {
             case REDIRECT_TAG => {
               wikiPage.redirectTitle = buffer.toString()
             }
-
             case REVISION_TAG => {
             }
             case PARENTID_TAG =>
@@ -210,12 +208,9 @@ object Parser {
             case TIMESTAMP_TAG => {
               wikiPage.revision.timestamp = buffer.toString()
             }
-
-
             case USERNAME_TAG => {
               wikiPage.revision.contributor.username = buffer.toString()
             }
-
             case MINOR_TAG => {
               wikiPage.revision.minor = buffer.toString()
             }
@@ -228,12 +223,9 @@ object Parser {
             case TEXT_TAG => {
               wikiPage.revision.text = buffer.toString()
             }
-
             case _ => {}
           }
         }
-
-
         case EvText(text) => {
           buffer.append(text)
         }
