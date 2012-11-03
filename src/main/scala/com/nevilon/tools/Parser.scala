@@ -174,8 +174,9 @@ object Parser {
           label match {
             case PAGE_TAG => {
               counter+=1
-              println(counter)
-              insert(wikiPage)
+              println(wikiPage.title)
+             // println(counter)
+             // insert(wikiPage)
               //wikiPages.append(wikiPage)
             }
             case TITLE_TAG => {
