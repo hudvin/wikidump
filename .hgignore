@@ -1,4 +1,5 @@
 syntax:glob
 target/
+.idea/
 *.iml
 *.swp
