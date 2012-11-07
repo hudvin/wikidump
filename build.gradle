@@ -1,32 +1,129 @@
 apply plugin: 'application'
-mainClassName='com.nevilon.tools.wikidump.Parser'
+mainClassName = 'com.nevilon.tools.wikidump.Parser'
 
-task hello {
-    doLast {
-        println 'Hello world!'
-    }
-}
 apply plugin: 'scala'
 apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'idea-scala'
+
+buildscript {
+    repositories {
+        maven {
+            url "https://raw.github.com/rodionmoiseev/maven-repo/master/repo/releases"
+        }
+    }
+    dependencies {
+        classpath group: 'org.rodion.gradle', name: 'idea-scala-plugin', version: '0.2'
+    }
+}
 
 repositories {
     mavenCentral()
+    maven {url 'http://scala-tools.org/repo-releases'}
+    maven {url 'https://raw.github.com/rodionmoiseev/maven-repo/master/repo/releases'}
 }
 
 jar {
     from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest { attributes 'Main-Class': mainClassName }
 }
 
+ideaScala {
+    //IntelliJ library name for Scala compiler
+    // default: 'gradle-scala-compiler-<scalaVersion>'
+    // defined in: project and module
+    scalaCompilerLibName = 'scala-compiler-lib'
+
+    //IntelliJ library name for Scala API libraries
+    // default: 'gradle-scala-library-<scalaVersion>'
+    // defined in: project and module
+    scalaLibraryLibName = 'my-scala-library-lib'
+
+    //Enable/disable IntelliJ type-aware syntax highlighting option
+    // default: true
+    // defined in: project
+    typeAwareHighlighting = false
+
+    compiler {
+        //Set Scala compiler maximum heap size (MB)
+        // default: 512
+        // defined in: module
+        maxHeapSize = 1024
+
+        //Set Scala compiler VM options
+        // default: '-Xss1m -server'
+        // defined in: module
+        vmParameters = '-Xss1m -server'
+
+        //Set join compilation order.
+        // false: javac, scalac
+        // true: scalac, javac
+        // default: true
+        // defined in: project
+        scalacBefore = false
+
+        fsc {
+            //Enable Fast Scala Compiler
+            // default: false
+            // defined in: module
+            enable = true
+
+            //Set FSC maximum heap size (MB)
+            // default: 512
+            // defined in: project
+            maxHeapSize = 1024
+
+            //Set FSC VM options
+            // default: '-Xms128m -Xss1m -server'
+            // defined in: project
+            vmParameters = '-Xms128m -Xss1m -server'
+
+            //Set FSC idle timeout (minutes). 0 for no timeout.
+            // default: 0
+            // defined in: project
+            idleTimeout = 1
+
+            //Set FSC server options
+            // default: ''
+            // defined in: project
+            serverOptions = ''
+
+            server {
+                //Enable connecting to external FSC server
+                // default: false
+                // defined in: project
+                enable = true
+
+                //External server's host name
+                // default: ''
+                // defined in: project
+                host = 'localhost'
+
+                //External server's port number
+                // default: -1 (unset)
+                // defined in: project
+                port = 32834
+
+                //Path to shared directory
+                // default: ''
+                // defined in: project
+                sharedDirectory = '/home/user/fsc/shared'
+            }
+        }
+    }
+}
 dependencies {
- scalaTools 'org.scala-lang:scala-compiler:2.9.2'
+    scalaTools 'org.scala-lang:scala-compiler:2.9.2'
     scalaTools 'org.scala-lang:scala-library:2.9.2'
+    scalaTools 'org.scala-lang:scala-compiler:2.9.2'
 
+    scalaApi 'org.scala-lang:scala-library:2.9.2'
     // Libraries needed for scala api
-    compile group: 'org.apache.hadoop', name:'hadoop-common', version: '0.22.0'
-    compile group: 'org.apache.hadoop', name:'hadoop-mapred', version: '0.22.0'
-    compile group: 'org.apache.hbase',  name:'hbase', version: '0.94.1'
+    compile group: 'org.apache.hadoop', name: 'hadoop-common', version: '0.22.0'
+    compile group: 'org.apache.hadoop', name: 'hadoop-mapred', version: '0.22.0'
+    compile group: 'org.apache.hbase', name: 'hbase', version: '0.94.1'
+    compile group: 'mysql', name: 'mysql-connector-java', version: '5.1.6'
 
-   
     compile 'org.scala-lang:scala-library:2.9.2'
     testCompile group: 'junit', name: 'junit', version: '4.+'
 }
