@@ -13,6 +13,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
 import java.sql.{PreparedStatement, Connection, DriverManager}
 import java.util.UUID
+import com.mongodb.{BasicDBObject, DBCollection, DB, Mongo}
 
 /**
  * Created with IntelliJ IDEA.
@@ -48,10 +49,11 @@ object Parser {
 
   private var importer: Importer = null
   private val wikiPages = new ListBuffer[WikiPage]()
+  var counter = 0
 
 
   def main(args: Array[String]) {
-    importer  = new MySQlImporter(args)
+    importer  = new MongoImporter(args)
 
     val xmlReader = new XMLEventReader(Source.fromInputStream(new BufferedInputStream(java.lang.System.in), "utf-8")).buffered
     var wikiPage: WikiPage = null
@@ -83,6 +85,8 @@ object Parser {
             case PAGE_TAG => {
               wikiPages.append(wikiPage)
               if (wikiPages.length > cacheSize) {
+                counter+=cacheSize
+                println(counter)
                 importer.saveData(wikiPages)
                 wikiPages.clear()
               }
@@ -153,6 +157,61 @@ object Parser {
 abstract class Importer(args: Array[String]) {
 
   def saveData(pages: ListBuffer[WikiPage])
+
+}
+
+
+class MongoImporter(val args: Array[String]) extends Importer(args){
+
+
+  private val TITLE_FAMILY = "title"
+  private val NS_FAMILY = "ns"
+  private val ID_FAMILY = "id"
+  private val REDIRECT_TITLE_FAMILY = "redirect_title"
+  private val REVISION_ID_FAMILY = "revision_id"
+  private val REVISION_PARENT_ID_FAMILY = "revision_parent_id"
+  private val REVISION_TIMESTAMP_FAMILY = "revision_timestamp"
+  private val REVISION_COMMENT_FAMILY = "revision_comment"
+  private val REVISION_SHA1_FAMILY = "revision_sha1"
+  private val REVISION_TEXT_FAMILY = "revison_text"
+  private val REVISION_MINOR_FAMILY = "revision_minor"
+  private val REVISION_CONTRIBUTOR_ID_FAMILY = "revision_contributor_id"
+  private val REVISION_CONTRIBUTOR_USERNAME_FAMILY = "revision_contributor_username"
+
+  private var db:DB = null
+  private var coll:DBCollection = null
+
+  connect()
+
+  private def connect(){
+    val mongo = new Mongo( "localhost" , 27017 )
+    db =  mongo.getDB( "wiki" )
+    coll = db.getCollection("pages")
+
+  }
+
+  override def saveData(pages: ListBuffer[WikiPage]){
+    pages.foreach(page => {
+
+      val doc = new BasicDBObject();
+
+      doc.put(TITLE_FAMILY, page.title)
+      doc.put(NS_FAMILY, page.ns)
+      doc.put(ID_FAMILY, page.id)
+      doc.put(REDIRECT_TITLE_FAMILY, page.redirectTitle)
+      doc.put(REVISION_ID_FAMILY, page.revision.id)
+      doc.put(REVISION_PARENT_ID_FAMILY,  page.revision.parentId)
+      doc.put(REVISION_TIMESTAMP_FAMILY, page.revision.timestamp )
+      doc.put(REVISION_COMMENT_FAMILY, page.revision.comment)
+      doc.put(REVISION_SHA1_FAMILY, page.revision.sha1)
+      doc.put(REVISION_TEXT_FAMILY, page.revision.text )
+      doc.put(REVISION_MINOR_FAMILY, page.revision.minor)
+      doc.put(REVISION_CONTRIBUTOR_ID_FAMILY, page.revision.contributor.id)
+      doc.put(REVISION_CONTRIBUTOR_USERNAME_FAMILY,page.revision.contributor.username )
+      coll.insert(doc)
+
+    })
+  }
 
 }
 
