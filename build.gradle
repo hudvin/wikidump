@@ -1,5 +1,5 @@
 apply plugin: 'application'
-mainClassName = 'com.nevilon.tools.wikidump.Parser'
+mainClassName = 'com.nevilon.tools.wikidump.Runner'
 
 apply plugin: 'scala'
 apply plugin: 'java'
