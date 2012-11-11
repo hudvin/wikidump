@@ -52,9 +52,95 @@ object Parser {
   var counter = 0
 
 
+  def test(){
+    val importer = new MongoPageLinksImporter
+
+    val xmlReader = new XMLEventReader(Source.fromInputStream(new BufferedInputStream(java.lang.System.in), "utf-8")).buffered
+    var pageLink: PageLink = null
+    var buffer: StringBuilder = new StringBuilder
+    val path: mutable.Stack[String] = new mutable.Stack[String]
+    var counter = 0
+    var currentFieldName = ""
+    val pageLinks = new ListBuffer[PageLink]()
+    while (xmlReader.hasNext) {
+      val v = xmlReader.next
+      v match {
+        case EvElemStart(_, label, attr_, _) => {
+          path.push(label)
+          counter+=1
+         // println(path)
+            path.slice(0,3).toList match{
+              case List("field","row", "table_data")=>{
+                buffer = new StringBuilder
+                currentFieldName = attr_.get("name").get.toString()
+              }
+              case List("row", "table_data","database")=>{pageLink = new PageLink}
+              case _ =>{println("none")}
+
+            }
+          }
+        case EvElemEnd(_, label) => {
+       //   println("end " + currentFieldName + " " + path.slice(0,3))
+
+          path.slice(0,3).toList match{
+            case List("field","row", "table_data")=>{
+              currentFieldName match {
+
+                case "cl_from" =>{pageLink.from = buffer.toString()}
+                case "cl_to" =>{pageLink.to = buffer.toString()}
+                case "cl_sortkey" =>{pageLink.sortKey= buffer.toString()}
+                case "cl_timestamp" =>{pageLink.timestamp= buffer.toString()}
+                case "cl_sortkey_prefix" =>{pageLink.sortKeyPrefix= buffer.toString()}
+                case "cl_collation" =>{pageLink.collation= buffer.toString()}
+                case "cl_type" =>{pageLink.type_ = buffer.toString()}
+
+              }
+            }
+
+            case  List("row", "table_data","database")=>{
+              pageLinks+=pageLink
+              if (pageLinks.length>5000){
+                importer.saveData(pageLinks)
+                pageLinks.clear()
+              }
+              //println(pageLink)
+
+
+              /*
+                import
+
+               */
+
+            }
+            case _ =>{}
+
+          }
+          path.pop()
+          //check path
+          //label match
+
+        }
+        case EvText(text) => {
+         // println(text)
+          buffer.append(text)
+        }
+        case _ =>{}
+      }
+      }
+
+      //import pagelinks to mongodb
+  }
+
+
+
   def main(args: Array[String]) {
+    test()
+
+    /*
     importer  = new MongoImporter(args)
 
+
+    //pages importer
     val xmlReader = new XMLEventReader(Source.fromInputStream(new BufferedInputStream(java.lang.System.in), "utf-8")).buffered
     var wikiPage: WikiPage = null
     var buffer: StringBuilder = null
@@ -145,6 +231,7 @@ object Parser {
         case _ => {}
       }
     }
+    */
   }
 
   private def getIntValue(strValue: String): Int = strValue match {
@@ -160,6 +247,51 @@ abstract class Importer(args: Array[String]) {
 
 }
 
+class MongoPageLinksImporter {
+
+
+  /*
+
+                case "cl_from" =>{pageLink.from = buffer.toString()}
+                case "cl_to" =>{pageLink.to = buffer.toString()}
+                case "cl_sortkey" =>{pageLink.sortKey= buffer.toString()}
+                case "cl_timestamp" =>{pageLink.timestamp= buffer.toString()}
+                case "cl_sortkey_prefix" =>{pageLink.sortKeyPrefix= buffer.toString()}
+                case "cl_collation" =>{pageLink.collation= buffer.toString()}
+                case "cl_type" =>{pageLink.type_ = buffer.toString()}
+
+   */
+
+  private var db:DB = null
+  private var coll:DBCollection = null
+
+  connect()
+
+  private def connect(){
+    val mongo = new Mongo( "31.131.19.108" , 27017 )
+    db =  mongo.getDB( "wiki" )
+    coll = db.getCollection("pagelinks")
+
+  }
+
+   def saveData(pages: ListBuffer[PageLink]){
+    pages.foreach(pagelink => {
+
+      val doc = new BasicDBObject();
+
+      doc.put("cl_from", pagelink.from)
+      doc.put("cl_to", pagelink.to)
+      doc.put("cl_sortkey", pagelink.sortKey)
+      doc.put("cl_timestamp", pagelink.timestamp)
+      doc.put("cl_sortkey_prefix", pagelink.sortKeyPrefix)
+      doc.put("cl_collation",  pagelink.collation)
+      doc.put("cl_type", pagelink.type_)
+      coll.insert(doc)
+
+    })
+  }
+
+}
 
 class MongoImporter(val args: Array[String]) extends Importer(args){
 
@@ -408,4 +540,19 @@ class Revision {
     override def toString = "username: " + username + ",id: " + id
   }
 
+}
+
+
+class PageLink{
+
+  var from = ""
+  var to = ""
+  var sortKey = ""
+  var timestamp = ""
+  var sortKeyPrefix = ""
+  var collation = ""
+  var type_ = ""
+
+  override def toString = "from: "+ from + " to: "+ to +" sortkey: "+ sortKey + " timestamp: "+ timestamp +
+    " sortkeyprefix: " + sortKeyPrefix + " collation: " + collation + " type: " + type_
 }

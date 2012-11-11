@@ -1,5 +1,6 @@
 syntax:glob
 out/
+build/
 target/
 .idea/
 .gradle/
