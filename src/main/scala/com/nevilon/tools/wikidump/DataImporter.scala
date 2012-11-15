@@ -1,20 +1,21 @@
 package com.nevilon.tools.wikidump
 
 import collection.mutable.ListBuffer
-import com.mongodb.{BasicDBObject, Mongo, DBCollection, DB}
+import com.mongodb._
 import java.sql.{DriverManager, Connection, PreparedStatement}
 import java.util.UUID
 import org.apache.hadoop.hbase.client.{Put, HTable, HBaseAdmin}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor, HBaseConfiguration}
 import org.apache.hadoop.hbase.util.Bytes
+import java.util
 
 
 trait DataImporter[Record] {
 
   protected var buffer = new ListBuffer[Record]
 
-  private var maxBufferSize = 0
+  private var maxBufferSize = 500
 
   def setBufferSize(size: Int)
 
@@ -89,13 +90,14 @@ class MongoPageImporter() extends DataImporter[WikiPage] {
   connect()
 
   private def connect() {
-    val mongo = new Mongo("localhost", 27017)
+    val mongo = new Mongo("31.131.19.108", 27017)
     db = mongo.getDB("wiki")
     coll = db.getCollection("pages")
 
   }
 
   override def saveData() {
+    val dbObjects:util.List[DBObject] = new util.LinkedList[DBObject]
     buffer.foreach(page => {
 
       val doc = new BasicDBObject();
@@ -113,9 +115,13 @@ class MongoPageImporter() extends DataImporter[WikiPage] {
       doc.put(REVISION_MINOR_FAMILY, page.revision.minor)
       doc.put(REVISION_CONTRIBUTOR_ID_FAMILY, page.revision.contributor.id)
       doc.put(REVISION_CONTRIBUTOR_USERNAME_FAMILY, page.revision.contributor.username)
-      coll.insert(doc)
+
+      dbObjects.add(doc)
+
+
 
     })
+    coll.insert(dbObjects)
     buffer.clear()
   }
 
