@@ -90,10 +90,9 @@ class MongoPageImporter() extends DataImporter[WikiPage] {
   connect()
 
   private def connect() {
-    val mongo = new Mongo("31.131.19.108", 27017)
+    val mongo = new Mongo("localhost", 27017)
     db = mongo.getDB("wiki")
     coll = db.getCollection("pages")
-
   }
 
   override def saveData() {
